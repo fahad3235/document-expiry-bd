@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document Expiry BD</title>
+<meta name="description" content="Offline bilingual tracker for passport, NID, driving licence and other document expiry dates.">
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--muted:#667085;--line:#e4e7ec;--brand:#0b4f6c;--brand2:#12907e;--red:#b42318;--amber:#b54708;--green:#027a48;--radius:12px}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Bengali",sans-serif;background:var(--bg);color:var(--ink)}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);z-index:10}
+  .wrap{max-width:980px;margin:0 auto;padding:0 16px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0}
+  h1{font-size:22px;margin:0} .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  button.danger{background:#fff;color:var(--red);border-color:#f5c6c2}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  nav{display:flex;gap:6px;padding-bottom:12px;flex-wrap:wrap}
+  nav button{border-radius:999px} nav button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  main{padding:20px 0 40px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .stat .num{font-size:30px;font-weight:700} .stat .lbl{color:var(--muted);font-size:13px}
+  .stat.red .num{color:var(--red)} .stat.amber .num{color:var(--amber)} .stat.green .num{color:var(--green)}
+  .section{margin-top:20px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  input,select,textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .field{flex:1 1 180px} .field.small{flex:1 1 130px}
+  .err{color:var(--red);font-size:13px;min-height:18px;margin-top:6px}
+  .ok{color:var(--green);font-size:13px;min-height:18px;margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .badge.expired{background:#feeceb;color:var(--red)} .badge.critical{background:#fef3e2;color:var(--amber)}
+  .badge.warning{background:#fffaeb;color:#93370d} .badge.valid{background:#ecfdf3;color:var(--green)}
+  .doc-card{border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:10px;background:#fff}
+  .doc-card h3{margin:0 0 4px;font-size:16px} .meta{color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .actions button{padding:6px 10px;font-size:13px}
+  .empty{text-align:center;color:var(--muted);padding:36px 12px;border:1px dashed var(--line);border-radius:var(--radius);background:#fff}
+  .hint{color:var(--muted);font-size:13px}
+  .urgent{border-left:4px solid var(--red)} .urgent.warn{border-left-color:var(--amber)}
+  footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0;border-top:1px solid var(--line)}
+  .hidden{display:none!important}
+  @media(max-width:640px){.grid{grid-template-columns:repeat(2,1fr)} table{display:block;overflow-x:auto} h1{font-size:19px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1 data-i18n="appTitle">Document Expiry BD</h1>
+        <div class="sub" data-i18n="appSubtitle">Passport, NID, licence &amp; more &mdash; never miss a renewal</div>
+      </div>
+      <button id="langBtn" type="button">Bangla</button>
+    </div>
+    <nav aria-label="Sections">
+      <button type="button" data-tab="dashboard" class="active" data-i18n="tabDashboard">Dashboard</button>
+      <button type="button" data-tab="documents" data-i18n="tabDocuments">Documents</button>
+      <button type="button" data-tab="data" data-i18n="tabData">Data</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard">
+    <div class="grid" id="statsGrid">
+      <div class="card stat"><div class="num" id="statTotal">0</div><div class="lbl" data-i18n="statTotal">Total documents</div></div>
+      <div class="card stat red"><div class="num" id="statExpired">0</div><div class="lbl" data-i18n="statExpired">Expired</div></div>
+      <div class="card stat amber"><div class="num" id="statCritical">0</div><div class="lbl" data-i18n="statCritical">Expiring within 30 days</div></div>
+      <div class="card stat green"><div class="num" id="statValid">0</div><div class="lbl" data-i18n="statValid">Valid (90+ days)</div></div>
+    </div>
+    <div class="section">
+      <h2 data-i18n="nextUp">Next up</h2>
+      <div id="nextUpBox"></div>
+    </div>
+    <div class="section">
+      <h2 data-i18n="needsAttention">Needs attention</h2>
+      <div id="urgentList"></div>
+    </div>
+  </section>
+
+  <!-- DOCUMENTS -->
+  <section id="tab-documents" class="hidden">
+    <div class="card">
+      <h2 style="margin-top:0" data-i18n="addDoc">Add a document</h2>
+      <form id="docForm" novalidate>
+        <div class="row">
+          <div class="field"><label for="fType" data-i18n="lblType">Document type</label><select id="fType"></select></div>
+          <div class="field"><label for="fCustomType" data-i18n="lblCustomType">Custom type (if Other)</label><input id="fCustomType" type="text" maxlength="60" placeholder="e.g. Club membership"></div>
+          <div class="field"><label for="fHolder" data-i18n="lblHolder">Holder name</label><input id="fHolder" type="text" maxlength="80" required></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label for="fNumber" data-i18n="lblNumber">Document number (optional)</label><input id="fNumber" type="text" maxlength="40"></div>
+          <div class="field small"><label for="fIssued" data-i18n="lblIssued">Issue date (optional)</label><input id="fIssued" type="date"></div>
+          <div class="field small"><label for="fExpiry" data-i18n="lblExpiry">Expiry date</label><input id="fExpiry" type="date" required></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label for="fNotes" data-i18n="lblNotes">Notes (optional)</label><input id="fNotes" type="text" maxlength="500"></div>
+        </div>
+        <div class="err" id="formError" role="alert"></div>
+        <div class="row" style="margin-top:6px">
+          <button class="primary" type="submit" id="saveBtn" data-i18n="btnSave">Save document</button>
+          <button type="button" id="cancelEditBtn" class="hidden" data-i18n="btnCancel">Cancel edit</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section row">
+      <div class="field"><label for="q" data-i18n="lblSearch">Search</label><input id="q" type="search" placeholder="Name, type, number&hellip;"></div>
+      <div class="field small"><label for="statusFilter" data-i18n="lblStatus">Status</label><select id="statusFilter"></select></div>
+      <div class="field small"><label for="typeFilter" data-i18n="lblTypeFilter">Type</label><select id="typeFilter"></select></div>
+    </div>
+    <div class="section" id="docList"></div>
+  </section>
+
+  <!-- DATA -->
+  <section id="tab-data" class="hidden">
+    <div class="card">
+      <h2 style="margin-top:0" data-i18n="dataTitle">Backup &amp; restore</h2>
+      <p class="hint" data-i18n="dataHint">Your documents live only in this browser (localStorage). Export a JSON backup before clearing browser data.</p>
+      <div class="row" style="margin-top:12px">
+        <button type="button" id="exportBtn" data-i18n="btnExport">Export JSON</button>
+        <label class="row" style="gap:6px"><span data-i18n="btnImport">Import JSON</span><input id="importFile" type="file" accept="application/json,.json" style="width:auto"></label>
+      </div>
+      <div class="ok" id="dataMsg" role="status"></div>
+    </div>
+    <div class="card section">
+      <h2 style="margin-top:0" data-i18n="dangerTitle">Danger zone</h2>
+      <p class="hint" data-i18n="dangerHint">Erase every document stored in this browser. Type DELETE to confirm.</p>
+      <div class="row" style="margin-top:12px">
+        <input id="eraseConfirm" type="text" placeholder="DELETE" style="max-width:180px">
+        <button type="button" class="danger" id="eraseBtn" data-i18n="btnErase">Erase all data</button>
+      </div>
+      <div class="err" id="eraseMsg" role="alert"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap" data-i18n="footer">Personal reminder tool &mdash; not an official government service. Always verify renewal rules with the issuing authority.</footer>
+
+<script src="js/logic.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const ASOF = params.get('asof') || null; // deterministic testing only
+const LS_KEY = 'document-expiry-bd:v1';
+const LANG_KEY = 'document-expiry-bd:lang';
+
+const I18N = {
+  en: {
+    appTitle: 'Document Expiry BD', appSubtitle: 'Passport, NID, licence & more \u2014 never miss a renewal',
+    tabDashboard: 'Dashboard', tabDocuments: 'Documents', tabData: 'Data',
+    statTotal: 'Total documents', statExpired: 'Expired', statCritical: 'Expiring within 30 days', statValid: 'Valid (90+ days)',
+    nextUp: 'Next up', needsAttention: 'Needs attention',
+    addDoc: 'Add a document', lblType: 'Document type', lblCustomType: 'Custom type (if Other)', lblHolder: 'Holder name',
+    lblNumber: 'Document number (optional)', lblIssued: 'Issue date (optional)', lblExpiry: 'Expiry date', lblNotes: 'Notes (optional)',
+    btnSave: 'Save document', btnCancel: 'Cancel edit', lblSearch: 'Search', lblStatus: 'Status', lblTypeFilter: 'Type',
+    dataTitle: 'Backup & restore', dataHint: 'Your documents live only in this browser (localStorage). Export a JSON backup before clearing browser data.',
+    btnExport: 'Export JSON', btnImport: 'Import JSON',
+    dangerTitle: 'Danger zone', dangerHint: 'Erase every document stored in this browser. Type DELETE to confirm.',
+    btnErase: 'Erase all data',
+    footer: 'Personal reminder tool &mdash; not an official government service. Always verify renewal rules with the issuing authority.',
+    all: 'All', expired: 'Expired', critical: 'Expiring soon (\u226430 days)', warning: 'Expiring within 90 days', valid: 'Valid',
+    noDocs: 'No documents yet. Add your first one above.',
+    noMatch: 'No documents match your filters.',
+    noUrgent: 'Nothing needs attention \u2014 all documents are valid for 90+ days.',
+    noNext: 'No documents yet.',
+    edit: 'Edit', del: 'Delete', renew: 'Renew', history: 'Renewal history',
+    confirmDelete: 'Delete this document?', renewPrompt: 'Enter the new expiry date (YYYY-MM-DD):',
+    renewBad: 'New expiry must be after the current expiry date.',
+    saved: 'Saved.', deleted: 'Deleted.', renewed: 'Renewal recorded.', imported: 'Import successful.',
+    erased: 'All data erased.', eraseType: 'Type DELETE to confirm erasure.',
+    importBad: 'Import failed: ', exportEmpty: 'Nothing to export yet.',
+    expires: 'Expires', issued: 'Issued', number: 'No.',
+    editDoc: 'Edit document', addDocTitle: 'Add a document'
+  },
+  bn: {
+    appTitle: '\u09a8\u09a5\u09bf\u09b0 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u099f\u09cd\u09b0\u09cd\u09af\u09be\u0995\u09be\u09b0', appSubtitle: '\u09aa\u09be\u09b8\u09aa\u09cb\u09b0\u09cd\u099f, \u098f\u09a8\u0986\u0987\u09a1\u09bf, \u09b2\u09be\u0987\u09b8\u09c7\u09a8\u09cd\u09b8 \u0993 \u0986\u09b0\u0993 \u2014 \u09a8\u09ac\u09be\u09af\u09bc\u09a8 \u09ae\u09bf\u09b8 \u09b9\u09ac\u09c7 \u09a8\u09be',
+    tabDashboard: '\u09a1\u09cd\u09af\u09be\u09b6\u09ac\u09cb\u09b0\u09cd\u09a1', tabDocuments: '\u09a8\u09a5\u09bf\u09b8\u09ae\u09c2\u09b9', tabData: '\u09a1\u09c7\u099f\u09be',
+    statTotal: '\u09ae\u09cb\u099f \u09a8\u09a5\u09bf', statExpired: '\u09ae\u09c7\u09af\u09bc\u09be\u09a6\u09cb\u09a4\u09cd\u09a4\u09c0\u09b0\u09cd\u09a3', statCritical: '\u09e9\u09e6 \u09a6\u09bf\u09a8\u09c7\u09b0 \u09ae\u09a7\u09cd\u09af\u09c7 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7', statValid: '\u09ac\u09c8\u09a7 (\u09ef\u09e6+ \u09a6\u09bf\u09a8)',
+    nextUp: '\u09b8\u09ac\u09be\u09b0 \u0986\u0997\u09c7', needsAttention: '\u09a8\u099c\u09b0 \u09a6\u09bf\u09a8',
+    addDoc: '\u09a8\u09a5\u09bf \u09af\u09cb\u0997 \u0995\u09b0\u09c1\u09a8', lblType: '\u09a8\u09a5\u09bf\u09b0 \u09a7\u09b0\u09a8', lblCustomType: '\u0995\u09be\u09b8\u09cd\u099f\u09ae \u09a7\u09b0\u09a8 (\u0985\u09a8\u09cd\u09af\u09be\u09a8\u09cd\u09af \u09b9\u09b2\u09c7)', lblHolder: '\u09a7\u09be\u09b0\u0995\u09c7\u09b0 \u09a8\u09be\u09ae',
+    lblNumber: '\u09a8\u09a5\u09bf \u09a8\u09ae\u09cd\u09ac\u09b0 (\u0990\u099a\u09cd\u099b\u09bf\u0995)', lblIssued: '\u0987\u09b8\u09cd\u09af\u09c1\u09b0 \u09a4\u09be\u09b0\u09bf\u0996 (\u0990\u099a\u09cd\u099b\u09bf\u0995)', lblExpiry: '\u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7\u09c7\u09b0 \u09a4\u09be\u09b0\u09bf\u0996', lblNotes: '\u09a8\u09cb\u099f (\u0990\u099a\u09cd\u099b\u09bf\u0995)',
+    btnSave: '\u09a8\u09a5\u09bf \u09b8\u0982\u09b0\u0995\u09cd\u09b7\u09a3', btnCancel: '\u09b8\u09ae\u09cd\u09aa\u09be\u09a6\u09a8\u09be \u09ac\u09be\u09a4\u09bf\u09b2', lblSearch: '\u0996\u09c1\u0981\u099c\u09c1\u09a8', lblStatus: '\u0985\u09ac\u09b8\u09cd\u09a5\u09be', lblTypeFilter: '\u09a7\u09b0\u09a8',
+    dataTitle: '\u09ac\u09cd\u09af\u09be\u0995\u0986\u09aa \u0993 \u09aa\u09c1\u09a8\u09b0\u09c1\u09a6\u09cd\u09a7\u09be\u09b0', dataHint: '\u0986\u09aa\u09a8\u09be\u09b0 \u09a8\u09a5\u09bf\u0997\u09c1\u09b2\u09cb \u09b6\u09c1\u09a7\u09c1 \u098f\u0987 \u09ac\u09cd\u09b0\u09be\u0989\u099c\u09be\u09b0\u09c7 (localStorage) \u09a5\u09be\u0995\u09c7\u0964 \u09ac\u09cd\u09b0\u09be\u0989\u099c\u09be\u09b0 \u09a1\u09c7\u099f\u09be \u09ae\u09c1\u099b\u09be\u09b0 \u0986\u0997\u09c7 JSON \u09ac\u09cd\u09af\u09be\u0995\u0986\u09aa \u09a8\u09bf\u09a8\u0964',
+    btnExport: 'JSON \u098f\u0995\u09cd\u09b8\u09aa\u09cb\u09b0\u09cd\u099f', btnImport: 'JSON \u0987\u09ae\u09aa\u09cb\u09b0\u09cd\u099f',
+    dangerTitle: '\u09ac\u09bf\u09aa\u099c\u09cd\u099c\u09a8\u0995 \u0985\u099e\u09cd\u099a\u09b2', dangerHint: '\u098f\u0987 \u09ac\u09cd\u09b0\u09be\u0989\u099c\u09be\u09b0\u09c7 \u09b8\u0982\u09b0\u0995\u09cd\u09b7\u09bf\u09a4 \u09b8\u09ac \u09a8\u09a5\u09bf \u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09c1\u09a8\u0964 \u09a8\u09bf\u09b6\u09cd\u099a\u09bf\u09a4 \u0995\u09b0\u09a4\u09c7 DELETE \u09b2\u09bf\u0996\u09c1\u09a8\u0964',
+    btnErase: '\u09b8\u09ac \u09a1\u09c7\u099f\u09be \u09ae\u09c1\u099b\u09c1\u09a8',
+    footer: '\u09ac\u09cd\u09af\u0995\u09cd\u09a4\u09bf\u0997\u09a4 \u09b0\u09bf\u09ae\u09be\u0987\u09a8\u09cd\u09a1\u09be\u09b0 \u099f\u09c1\u09b2 \u2014 \u09b8\u09b0\u0995\u09be\u09b0\u09bf \u09b8\u09c7\u09ac\u09be \u09a8\u09af\u09bc\u0964 \u09a8\u09ac\u09be\u09af\u09bc\u09a8\u09c7\u09b0 \u09a8\u09bf\u09af\u09bc\u09ae \u0987\u09b8\u09cd\u09af\u09c1\u0995\u09be\u09b0\u09c0 \u0995\u09b0\u09cd\u09a4\u09c3\u09aa\u0995\u09cd\u09b7\u09c7\u09b0 \u0995\u09be\u099b \u09a5\u09c7\u0995\u09c7 \u09af\u09be\u099a\u09be\u0987 \u0995\u09b0\u09c1\u09a8\u0964',
+    all: '\u09b8\u09ac', expired: '\u09ae\u09c7\u09af\u09bc\u09be\u09a6\u09cb\u09a4\u09cd\u09a4\u09c0\u09b0\u09cd\u09a3', critical: '\u09b6\u09c0\u0998\u09cd\u09b0\u0987 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7 (\u2264\u09e9\u09e6 \u09a6\u09bf\u09a8)', warning: '\u09ef\u09e6 \u09a6\u09bf\u09a8\u09c7\u09b0 \u09ae\u09a7\u09cd\u09af\u09c7 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7', valid: '\u09ac\u09c8\u09a7',
+    noDocs: '\u098f\u0996\u09a8\u09cb \u0995\u09cb\u09a8\u09cb \u09a8\u09a5\u09bf \u09a8\u09c7\u0987\u0964 \u0989\u09aa\u09b0\u09c7 \u09aa\u09cd\u09b0\u09a5\u09ae\u099f\u09bf \u09af\u09cb\u0997 \u0995\u09b0\u09c1\u09a8\u0964',
+    noMatch: '\u09ab\u09bf\u09b2\u09cd\u099f\u09be\u09b0\u09c7\u09b0 \u09b8\u09be\u09a5\u09c7 \u0995\u09cb\u09a8\u09cb \u09a8\u09a5\u09bf \u09ae\u09bf\u09b2\u099b\u09c7 \u09a8\u09be\u0964',
+    noUrgent: '\u09a8\u099c\u09b0 \u09a6\u09c7\u0993\u09af\u09bc\u09be\u09b0 \u09ae\u09a4\u09cb \u0995\u09bf\u099b\u09c1 \u09a8\u09c7\u0987 \u2014 \u09b8\u09ac \u09a8\u09a5\u09bf \u09ef\u09e6+ \u09a6\u09bf\u09a8 \u09ac\u09c8\u09a7\u0964',
+    noNext: '\u098f\u0996\u09a8\u09cb \u0995\u09cb\u09a8\u09cb \u09a8\u09a5\u09bf \u09a8\u09c7\u0987\u0964',
+    edit: '\u09b8\u09ae\u09cd\u09aa\u09be\u09a6\u09a8\u09be', del: '\u09ae\u09c1\u099b\u09c1\u09a8', renew: '\u09a8\u09ac\u09be\u09af\u09bc\u09a8', history: '\u09a8\u09ac\u09be\u09af\u09bc\u09a8 \u0987\u09a4\u09bf\u09b9\u09be\u09b8',
+    confirmDelete: '\u098f\u0987 \u09a8\u09a5\u09bf\u099f\u09bf \u09ae\u09c1\u099b\u09ac\u09c7\u09a8?', renewPrompt: '\u09a8\u09a4\u09c1\u09a8 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7\u09c7\u09b0 \u09a4\u09be\u09b0\u09bf\u0996 \u09a6\u09bf\u09a8 (YYYY-MM-DD):',
+    renewBad: '\u09a8\u09a4\u09c1\u09a8 \u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7\u09c7\u09b0 \u09a4\u09be\u09b0\u09bf\u0996 \u09ac\u09b0\u09cd\u09a4\u09ae\u09be\u09a8 \u09a4\u09be\u09b0\u09bf\u0996\u09c7\u09b0 \u09aa\u09b0\u09c7 \u09b9\u09a4\u09c7 \u09b9\u09ac\u09c7\u0964',
+    saved: '\u09b8\u0982\u09b0\u0995\u09cd\u09b7\u09bf\u09a4\u0964', deleted: '\u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09be \u09b9\u09af\u09bc\u09c7\u099b\u09c7\u0964', renewed: '\u09a8\u09ac\u09be\u09af\u09bc\u09a8 \u09b0\u09c7\u0995\u09b0\u09cd\u09a1 \u0995\u09b0\u09be \u09b9\u09af\u09bc\u09c7\u099b\u09c7\u0964', imported: '\u0987\u09ae\u09aa\u09cb\u09b0\u09cd\u099f \u09b8\u09ab\u09b2\u0964',
+    erased: '\u09b8\u09ac \u09a1\u09c7\u099f\u09be \u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09be \u09b9\u09af\u09bc\u09c7\u099b\u09c7\u0964', eraseType: '\u09ae\u09c1\u099b\u09a4\u09c7 \u09a8\u09bf\u09b6\u09cd\u099a\u09bf\u09a4 \u0995\u09b0\u09a4\u09c7 DELETE \u09b2\u09bf\u0996\u09c1\u09a8\u0964',
+    importBad: '\u0987\u09ae\u09aa\u09cb\u09b0\u09cd\u099f \u09ac\u09cd\u09af\u09b0\u09cd\u09a5: ', exportEmpty: '\u098f\u0995\u09cd\u09b8\u09aa\u09cb\u09b0\u09cd\u099f \u0995\u09b0\u09be\u09b0 \u09ae\u09a4\u09cb \u0995\u09bf\u099b\u09c1 \u09a8\u09c7\u0987\u0964',
+    expires: '\u09ae\u09c7\u09af\u09bc\u09be\u09a6 \u09b6\u09c7\u09b7', issued: '\u0987\u09b8\u09cd\u09af\u09c1', number: '\u09a8\u0982',
+    editDoc: '\u09a8\u09a5\u09bf \u09b8\u09ae\u09cd\u09aa\u09be\u09a6\u09a8\u09be', addDocTitle: '\u09a8\u09a5\u09bf \u09af\u09cb\u0997 \u0995\u09b0\u09c1\u09a8'
+  }
+};
+
+let lang = localStorage.getItem(LANG_KEY) || 'en';
+let docs = loadDocs();
+let editingId = null;
+
+function loadDocs() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const v = validateImport({ app: 'document-expiry-bd', version: 1, documents: parsed });
+    return v.ok ? v.documents : [];
+  } catch { return []; }
+}
+function saveDocs() { localStorage.setItem(LS_KEY, JSON.stringify(docs)); }
+function t(k) { return (I18N[lang] || I18N.en)[k] || k; }
+function fmt(n) { return lang === 'bn' ? toBengaliDigits(String(n)) : String(n); }
+function fmtDate(iso) {
+  if (!iso) return '\u2014';
+  if (lang === 'bn') return toBengaliDigits(iso.replace(/-/g, '/'));
+  return iso;
+}
+
+function applyLang() {
+  document.documentElement.lang = lang === 'bn' ? 'bn' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  $('langBtn').textContent = lang === 'bn' ? 'English' : '\u09ac\u09be\u0982\u09b2\u09be';
+  $('q').placeholder = lang === 'bn' ? '\u09a8\u09be\u09ae, \u09a7\u09b0\u09a8, \u09a8\u09ae\u09cd\u09ac\u09b0\u2026' : 'Name, type, number\u2026';
+  $('fCustomType').placeholder = lang === 'bn' ? '\u09af\u09c7\u09ae\u09a8: \u0995\u09cd\u09b2\u09be\u09ac \u09b8\u09a6\u09b8\u09cd\u09af\u09aa\u09a6' : 'e.g. Club membership';
+  buildFilters();
+  render();
+}
+
+function buildFilters() {
+  const st = $('statusFilter');
+  const cur = st.value || 'all';
+  st.innerHTML = [['all', t('all')], ['expired', t('expired')], ['critical', t('critical')], ['warning', t('warning')], ['valid', t('valid')]]
+    .map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  st.value = cur;
+  const tf = $('typeFilter');
+  const curt = tf.value || 'all';
+  const types = [...new Set(docs.map((d) => d.type))].sort();
+  tf.innerHTML = [`<option value="all">${t('all')}</option>`].concat(types.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`)).join('');
+  tf.value = types.includes(curt) ? curt : 'all';
+  const sel = $('fType');
+  sel.innerHTML = DOC_TYPES.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function statusBadge(doc) {
+  const s = statusOf(doc, ASOF);
+  return `<span class="badge ${s}">${t(s)} \u00b7 ${escapeHtml(formatDaysRemaining(daysUntil(doc.expiry, ASOF), lang))}</span>`;
+}
+
+function docCard(doc) {
+  const s = statusOf(doc, ASOF);
+  const hist = (doc.history || []).map((h) => `<div class="meta">${escapeHtml(fmtDate(h.date))}: ${escapeHtml(fmtDate(h.oldExpiry))} \u2192 ${escapeHtml(fmtDate(h.newExpiry))}</div>`).join('');
+  return `<div class="doc-card ${s === 'expired' ? 'urgent' : s === 'critical' ? 'urgent warn' : ''}" data-id="${doc.id}">
+    <h3>${escapeHtml(doc.type)} \u2014 ${escapeHtml(doc.holder)}</h3>
+    <div class="meta">${t('number')} ${escapeHtml(doc.number || '\u2014')} \u00b7 ${t('issued')} ${escapeHtml(fmtDate(doc.issued))} \u00b7 ${t('expires')} ${escapeHtml(fmtDate(doc.expiry))}</div>
+    ${doc.notes ? `<div class="meta">${escapeHtml(doc.notes)}</div>` : ''}
+    <div style="margin-top:8px">${statusBadge(doc)}</div>
+    ${hist ? `<div style="margin-top:8px"><strong>${t('history')}</strong>${hist}</div>` : ''}
+    <div class="actions">
+      <button type="button" data-act="renew">${t('renew')}</button>
+      <button type="button" data-act="edit">${t('edit')}</button>
+      <button type="button" data-act="del" class="danger">${t('del')}</button>
+    </div></div>`;
+}
+
+function render() {
+  const c = counts(docs, ASOF);
+  $('statTotal').textContent = fmt(c.total);
+  $('statExpired').textContent = fmt(c.expired);
+  $('statCritical').textContent = fmt(c.critical);
+  $('statValid').textContent = fmt(c.valid);
+  const next = nextExpiring(docs, ASOF);
+  $('nextUpBox').innerHTML = next ? docCard(next) : `<div class="empty">${t('noNext')}</div>`;
+  const urgent = sortDocs(docs, ASOF).filter((d) => ['expired', 'critical', 'warning'].includes(statusOf(d, ASOF)));
+  $('urgentList').innerHTML = urgent.length ? urgent.map(docCard).join('') : `<div class="empty">${t('noUrgent')}</div>`;
+  const filtered = sortDocs(filterDocs(docs, $('q').value, $('statusFilter').value, $('typeFilter').value, ASOF), ASOF);
+  $('docList').innerHTML = docs.length === 0
+    ? `<div class="empty">${t('noDocs')}</div>`
+    : filtered.length === 0 ? `<div class="empty">${t('noMatch')}</div>` : filtered.map(docCard).join('');
+}
+
+function setForm(doc) {
+  editingId = doc ? doc.id : null;
+  $('fType').value = doc && DOC_TYPES.includes(doc.type) ? doc.type : 'Other';
+  $('fCustomType').value = doc && !DOC_TYPES.includes(doc.type) ? doc.type : '';
+  $('fHolder').value = doc ? doc.holder : '';
+  $('fNumber').value = doc ? (doc.number || '') : '';
+  $('fIssued').value = doc ? (doc.issued || '') : '';
+  $('fExpiry').value = doc ? doc.expiry : '';
+  $('fNotes').value = doc ? (doc.notes || '') : '';
+  $('formError').textContent = '';
+  $('cancelEditBtn').classList.toggle('hidden', !doc);
+  document.querySelector('#tab-documents h2').textContent = doc ? t('editDoc') : t('addDocTitle');
+}
+
+$('docForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const rawType = $('fType').value;
+  const type = rawType === 'Other' ? $('fCustomType').value.trim() : rawType;
+  const patch = {
+    type, holder: $('fHolder').value.trim(), number: $('fNumber').value.trim(),
+    issued: $('fIssued').value, expiry: $('fExpiry').value, notes: $('fNotes').value.trim()
+  };
+  if (editingId) {
+    const r = updateDoc(docs, editingId, patch);
+    if (!r.ok) { $('formError').textContent = r.errors[0]; return; }
+    docs = r.docs;
+  } else {
+    const r = addDoc(docs, patch);
+    if (!r.ok) { $('formError').textContent = r.errors[0]; return; }
+    docs = r.docs;
+  }
+  saveDocs(); setForm(null); buildFilters(); render();
+  $('formError').textContent = ''; $('formError').className = 'ok'; $('formError').textContent = t('saved');
+});
+
+$('cancelEditBtn').addEventListener('click', () => setForm(null));
+
+$('docList').addEventListener('click', onDocAction);
+$('nextUpBox').addEventListener('click', onDocAction);
+$('urgentList').addEventListener('click', onDocAction);
+
+function onDocAction(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const card = e.target.closest('.doc-card');
+  const id = card.dataset.id;
+  const doc = docs.find((d) => d.id === id);
+  if (!doc) return;
+  const act = btn.dataset.act;
+  if (act === 'del') {
+    if (!confirm(t('confirmDelete'))) return;
+    docs = deleteDoc(docs, id); saveDocs(); buildFilters(); render();
+    $('formError').textContent = ''; $('formError').className = 'ok'; $('formError').textContent = t('deleted');
+  } else if (act === 'edit') {
+    setForm(doc);
+    document.querySelector('[data-tab="documents"]').click();
+    $('fHolder').focus();
+  } else if (act === 'renew') {
+    const input = prompt(t('renewPrompt'), doc.expiry);
+    if (input === null) return;
+    const r = renewDoc(docs, id, input.trim(), ASOF);
+    if (!r.ok) { alert(t('renewBad')); return; }
+    docs = r.docs; saveDocs(); render();
+    $('formError').textContent = ''; $('formError').className = 'ok'; $('formError').textContent = t('renewed');
+  }
+}
+
+['q', 'statusFilter', 'typeFilter'].forEach((id) => $(id).addEventListener('input', render));
+
+$('langBtn').addEventListener('click', () => {
+  lang = lang === 'bn' ? 'en' : 'bn';
+  localStorage.setItem(LANG_KEY, lang);
+  applyLang();
+});
+
+document.querySelectorAll('nav button[data-tab]').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav button[data-tab]').forEach((x) => x.classList.toggle('active', x === b));
+    ['dashboard', 'documents', 'data'].forEach((s) => $('tab-' + s).classList.toggle('hidden', s !== b.dataset.tab));
+  });
+});
+
+$('exportBtn').addEventListener('click', () => {
+  if (!docs.length) { $('dataMsg').textContent = t('exportEmpty'); return; }
+  const blob = new Blob([JSON.stringify({ app: 'document-expiry-bd', version: 1, documents: docs }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'document-expiry-bd-backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $('dataMsg').textContent = t('saved');
+});
+
+$('importFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const v = validateImport(data);
+    if (!v.ok) { $('dataMsg').textContent = t('importBad') + v.error; return; }
+    docs = v.documents;
+    saveDocs(); buildFilters(); render();
+    $('dataMsg').textContent = t('imported');
+  } catch (err) {
+    $('dataMsg').textContent = t('importBad') + err.message;
+  }
+  e.target.value = '';
+});
+
+$('eraseBtn').addEventListener('click', () => {
+  if ($('eraseConfirm').value.trim() !== 'DELETE') { $('eraseMsg').textContent = t('eraseType'); return; }
+  docs = []; editingId = null;
+  localStorage.removeItem(LS_KEY);
+  $('eraseConfirm').value = '';
+  $('eraseMsg').textContent = '';
+  $('dataMsg').textContent = t('erased');
+  setForm(null); buildFilters(); render();
+});
+
+setForm(null);
+applyLang();
+</script>
+</body>
+</html>
